@@ -86,22 +86,52 @@ int main(int argc, char *argv[]) {
 	}
 	
 	key_t key = 1094;
-	int *clockSeconds, *clockNano;
+	int *clockSecs, *clockNano;
 	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
 	if(shmid < 0) {
 		errorMessage(programName, "Function shmget failed. ");
 	}
 	//attach ourselves to that shared memory
-	clockSeconds = shmat(shmid, NULL, 0); //attempting to store 2 numbers in shared memory
-	clockNano = clockSeconds + 1;
-	if((clockSeconds == (int *) -1) || (clockNano == (int *) -1)) {
+	clockSecs = shmat(shmid, NULL, 0); //attempting to store 2 numbers in shared memory
+	clockNano = clockSecs + 1;
+	if((clockSecs == (int *) -1) || (clockNano == (int *) -1)) {
 		errorMessage(programName, "Function shmat failed. ");
 	}
 	
 	printf("We've got shared memory!\n");
 	
+	
+	bool terminate = false;
+	bool makeChild = true;
+	int temp;
+	while (terminate != true) {
+		
+		if (makeChild == true) {
+			pid_t pid;
+			pid = fork();
+							
+			if (pid == 0) { //child
+				execl ("user", "user", NULL);
+				errorMessage(programName, "execl function failed. ");
+			}
+			else if (pid > 0) { //parent
+				//numKidsRunning += 1;
+				//write to output file the time this process was launched
+				printf("Created child %d at %d:%d\n", pid, *clockSecs, *clockNano);
+				makeChild = false;
+			}
+		}
+		
+		temp = waitpid(-1, NULL, WNOHANG);
+		if (temp > 0) {
+			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
+			terminate = true;
+		}
+		
+	}
+	
 		//destroy shared memory
-	printf("Parent terminating %d:%d\n", *clockSeconds, *clockNano);
+	printf("Parent terminating %d:%d\n", *clockSecs, *clockNano);
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if (ctl_return == -1) {
 		errorMessage(programName, "Function scmctl failed. ");

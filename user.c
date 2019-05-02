@@ -12,5 +12,10 @@
 
 int main(int argc, char *argv[]) {
 	
+	printf("Child %d is alive!!\n", getpid());
+	
+	
+	
+	printf("Child %d is shutting down\n", getpid());
 	return 0;
 }

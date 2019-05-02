@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <sys/ipc.h> 
+#include <sys/shm.h>
 #include <sys/msg.h> 
 #include <sys/types.h>
 #include <unistd.h>
@@ -27,8 +28,31 @@ struct page {
 	int pageTable[32];
 };
 
+int shmid; //shared memory id, made a global so we can use it easily in errorMessage
+
+//takes in program name and error string, and runs error message procedure
+void errorMessage(char programName[100], char errorString[100]){
+	char errorFinal[200];
+	sprintf(errorFinal, "%s : Error : %s", programName, errorString);
+	perror(errorFinal);
+	
+	//destroy shared memory
+	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
+	if (ctl_return == -1) {
+		perror("Emergency shutdown of shared memory failed");
+	}
+
+	kill(-1*getpid(), SIGKILL);
+}
+
 int main(int argc, char *argv[]) {
 	
+	//this section of code allows us to print the program name in error messages
+	char programName[100];
+	strcpy(programName, argv[0]);
+	if (programName[0] == '.' && programName[1] == '/') {
+		memmove(programName, programName + 2, strlen(programName));
+	}
 	
 	printf("Welcome to Project 6\n");
 	
@@ -61,7 +85,29 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 	
+	key_t key = 1094;
+	int *clockSeconds, *clockNano;
+	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
+	if(shmid < 0) {
+		errorMessage(programName, "Function shmget failed. ");
+	}
+	//attach ourselves to that shared memory
+	clockSeconds = shmat(shmid, NULL, 0); //attempting to store 2 numbers in shared memory
+	clockNano = clockSeconds + 1;
+	if((clockSeconds == (int *) -1) || (clockNano == (int *) -1)) {
+		errorMessage(programName, "Function shmat failed. ");
+	}
 	
+	printf("We've got shared memory!\n");
+	
+		//destroy shared memory
+	printf("Parent terminating %d:%d\n", *clockSeconds, *clockNano);
+	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
+	if (ctl_return == -1) {
+		errorMessage(programName, "Function scmctl failed. ");
+	}
+	
+	printf("End of program\n");
 	
 	
 	return 0;

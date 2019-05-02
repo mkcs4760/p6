@@ -97,6 +97,8 @@ int main(int argc, char *argv[]) {
 	if((clockSecs == (int *) -1) || (clockNano == (int *) -1)) {
 		errorMessage(programName, "Function shmat failed. ");
 	}
+	*clockSecs = 0;
+	*clockNano = 0;
 	
 	printf("We've got shared memory!\n");
 	
@@ -105,6 +107,13 @@ int main(int argc, char *argv[]) {
 	bool makeChild = true;
 	int temp;
 	while (terminate != true) {
+		
+		*clockNano += 10000;
+		if (*clockNano >= 1000000000) { //increment the next unit
+			*clockSecs += 1;
+			*clockNano -= 1000000000;
+		}
+		
 		
 		if (makeChild == true) {
 			pid_t pid;

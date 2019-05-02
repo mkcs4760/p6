@@ -22,6 +22,11 @@ struct frame {
 	int pageStored;
 };
 
+struct page {
+	int myPID;
+	int pageTable[32];
+};
+
 int main(int argc, char *argv[]) {
 	
 	
@@ -29,7 +34,14 @@ int main(int argc, char *argv[]) {
 	
 	//we will need a frame table, as well as 18 page tables
 	struct frame frameTable[256];
-	int i;
+	//int page[32]; //each process has 32 pages of memory
+	//int page[32] pageTable[18];
+	
+	//each process needs an array of 32 ints
+	struct page PCB[18];
+	
+	
+	int i, j;
 	printf("Frame#\tDB\tRB\tProcess:Page\n");
 	for (i = 0; i < 256; i++) {
 		//preset everything to starting values
@@ -37,6 +49,16 @@ int main(int argc, char *argv[]) {
 		frameTable[i].referenceByte = 00000000;
 		frameTable[i].processStored = frameTable[i].pageStored = 0;
 		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+	}
+	
+	for (i = 0; i < 18; i++) {
+		PCB[i].myPID = 0;
+		printf("%d: ", PCB[i].myPID);
+		for (j = 0; j < 32; j++) {
+			PCB[i].pageTable[j] = 0;
+			printf("%d ", PCB[i].pageTable[j]);
+		}
+		printf("\n");
 	}
 	
 	

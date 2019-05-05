@@ -17,7 +17,6 @@
 struct frame {
 	//a frame consists of a dirty bit, a reference byte, the process that has a page being stored here, and the page of that process that is being stored here
 	bool dirtyBit;
-	//bool referenceByte[8];
 	unsigned char referenceByte;
 	int processStored;
 	int pageStored;
@@ -50,8 +49,9 @@ unsigned char shiftRight(unsigned char value) {
 
 unsigned char setMostSignificantBit(unsigned char value) {
 	if (value < 128) { //most significant bit is not set
-		return value + 128;
+		value += 128;
 	}
+	return value;
 }
 
 unsigned char resetReferenceByte() {
@@ -84,12 +84,12 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < 256; i++) {
 		//preset everything to starting values
 		frameTable[i].dirtyBit = false;
-		frameTable[i].referenceByte = 00000000;
+		frameTable[i].referenceByte = 0;
 		frameTable[i].processStored = frameTable[i].pageStored = 0;
 		//printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 	
-	/*for (i = 0; i < 18; i++) {
+	for (i = 0; i < 18; i++) {
 		PCB[i].myPID = 0;
 		printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < 32; j++) {
@@ -97,34 +97,8 @@ int main(int argc, char *argv[]) {
 			printf("%d ", PCB[i].pageTable[j]);
 		}
 		printf("\n");
-	}*/
+	}
 	
-	
-	unsigned char testByte;
-	//testByte = '10000000';
-	/*testByte = (unsigned char) - 1; //255
-	printf("%d\n", testByte);
-	testByte = 0;					//0
-	printf("%d\n", testByte);
-	testByte = (unsigned char) - 128;
-	printf("%d\n", testByte);*/
-	testByte = 0;
-	printf("testByte equals %d\n", testByte);
-	testByte = setMostSignificantBit(testByte);
-	printf("testByte equals %d\n", testByte);
-	testByte = shiftRight(testByte);
-	printf("testByte equals %d\n", testByte);
-	testByte = shiftRight(testByte);
-	printf("testByte equals %d\n", testByte);
-	testByte = setMostSignificantBit(testByte);
-	printf("testByte equals %d\n", testByte);
-	testByte = shiftRight(testByte);
-	printf("testByte equals %d\n", testByte);
-	testByte = resetReferenceByte();
-	printf("testByte equals %d\n", testByte);
-	
-	//everything below is commented out for now. We know it works. We need to focus on testing our reference byte...
-	/*
 	key_t smKey = 1094;
 	int *clockSecs, *clockNano;
 	int shmid = shmget(smKey, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
@@ -188,7 +162,7 @@ int main(int argc, char *argv[]) {
 		if (receive > 0) {
 			//we received a message
 			printf("Message received from child: %s\n", message.mesg_text);
-			
+			printf("Process %d is request access to memory bank %d\n", message.return_address, message.mesg_value);
 			message.mesg_type = message.return_address;
 			strncpy(message.mesg_text, "Parent to child", 100);
 			
@@ -220,7 +194,7 @@ int main(int argc, char *argv[]) {
 		errorMessage(programName, " Error with msgctl command: Could not remove message queue ");
 		exit(1);
 	}	
-	*/
+	
 	printf("End of program\n");
 	
 	

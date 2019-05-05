@@ -44,6 +44,21 @@ void errorMessage(char programName[100], char errorString[100]){
 	kill(-1*getpid(), SIGKILL);
 }
 
+unsigned char shiftRight(unsigned char value) {
+	return value / 2;
+}
+
+unsigned char setMostSignificantBit(unsigned char value) {
+	if (value < 128) { //most significant bit is not set
+		return value + 128;
+	}
+}
+
+unsigned char resetReferenceByte() {
+	return 128;
+}
+	
+
 int main(int argc, char *argv[]) {
 	
 	//this section of code allows us to print the program name in error messages
@@ -65,16 +80,16 @@ int main(int argc, char *argv[]) {
 	
 	
 	int i, j;
-	printf("Frame#\tDB\tRB\tProcess:Page\n");
+	//printf("Frame#\tDB\tRB\tProcess:Page\n");
 	for (i = 0; i < 256; i++) {
 		//preset everything to starting values
 		frameTable[i].dirtyBit = false;
 		frameTable[i].referenceByte = 00000000;
 		frameTable[i].processStored = frameTable[i].pageStored = 0;
-		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+		//printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 	
-	for (i = 0; i < 18; i++) {
+	/*for (i = 0; i < 18; i++) {
 		PCB[i].myPID = 0;
 		printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < 32; j++) {
@@ -82,8 +97,34 @@ int main(int argc, char *argv[]) {
 			printf("%d ", PCB[i].pageTable[j]);
 		}
 		printf("\n");
-	}
+	}*/
 	
+	
+	unsigned char testByte;
+	//testByte = '10000000';
+	/*testByte = (unsigned char) - 1; //255
+	printf("%d\n", testByte);
+	testByte = 0;					//0
+	printf("%d\n", testByte);
+	testByte = (unsigned char) - 128;
+	printf("%d\n", testByte);*/
+	testByte = 0;
+	printf("testByte equals %d\n", testByte);
+	testByte = setMostSignificantBit(testByte);
+	printf("testByte equals %d\n", testByte);
+	testByte = shiftRight(testByte);
+	printf("testByte equals %d\n", testByte);
+	testByte = shiftRight(testByte);
+	printf("testByte equals %d\n", testByte);
+	testByte = setMostSignificantBit(testByte);
+	printf("testByte equals %d\n", testByte);
+	testByte = shiftRight(testByte);
+	printf("testByte equals %d\n", testByte);
+	testByte = resetReferenceByte();
+	printf("testByte equals %d\n", testByte);
+	
+	//everything below is commented out for now. We know it works. We need to focus on testing our reference byte...
+	/*
 	key_t smKey = 1094;
 	int *clockSecs, *clockNano;
 	int shmid = shmget(smKey, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
@@ -179,7 +220,7 @@ int main(int argc, char *argv[]) {
 		errorMessage(programName, " Error with msgctl command: Could not remove message queue ");
 		exit(1);
 	}	
-	
+	*/
 	printf("End of program\n");
 	
 	

@@ -28,7 +28,7 @@ struct page {
 	int pageTable[32];
 };
 
-int shmid; //shared memory id, made a global so we can use it easily in errorMessage
+//int shmid; //shared memory id, made a global so we can use it easily in errorMessage
 
 //takes in program name and error string, and runs error message procedure
 void errorMessage(char programName[100], char errorString[100]){
@@ -36,11 +36,10 @@ void errorMessage(char programName[100], char errorString[100]){
 	sprintf(errorFinal, "%s : Error : %s", programName, errorString);
 	perror(errorFinal);
 	
+	//destroy message queue...NEED TO FIND A WAY TO DO THAT WITHOUT GLOBAL...
+	
 	//destroy shared memory
-	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
-	if (ctl_return == -1) {
-		perror("Emergency shutdown of shared memory failed");
-	}
+
 
 	kill(-1*getpid(), SIGKILL);
 }
@@ -85,9 +84,9 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 	
-	key_t key = 1094;
+	key_t smKey = 1094;
 	int *clockSecs, *clockNano;
-	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
+	int shmid = shmget(smKey, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
 	if(shmid < 0) {
 		errorMessage(programName, "Function shmget failed. ");
 	}
@@ -101,6 +100,18 @@ int main(int argc, char *argv[]) {
 	*clockNano = 0;
 	
 	printf("We've got shared memory!\n");
+	
+	//now message queue
+	key_t mqKey = 2094;
+    //msgget creates a message queue and returns identifier 
+    int msqid = msgget(mqKey, 0666 | IPC_CREAT);  //create the message queue
+	if (msqid < 0) {
+		errorMessage(programName, "Error using msgget for message queue ");
+	} else {
+		printf("We have shared memory!");
+	}
+	//we are now ready to send messages whenever we desire
+	
 	
 	
 	bool terminate = false;
@@ -131,6 +142,23 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		
+		int receive;
+		receive = msgrcv(msqid, &message, sizeof(message), getpid(), IPC_NOWAIT); //will wait until is receives a message
+		if (receive > 0) {
+			//we received a message
+			printf("Message received from child: %s\n", message.mesg_text);
+			
+			message.mesg_type = message.return_address;
+			strncpy(message.mesg_text, "Parent to child", 100);
+			
+			message.return_address = getpid();
+			int send = msgsnd(msqid, &message, sizeof(message), 0); //send message
+			if (send == -1) {
+				errorMessage(programName, "Error on msgsnd");
+			}
+		}
+		
+		
 		temp = waitpid(-1, NULL, WNOHANG);
 		if (temp > 0) {
 			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
@@ -139,12 +167,18 @@ int main(int argc, char *argv[]) {
 		
 	}
 	
-		//destroy shared memory
+	//destroy shared memory
 	printf("Parent terminating %d:%d\n", *clockSecs, *clockNano);
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if (ctl_return == -1) {
 		errorMessage(programName, "Function scmctl failed. ");
 	}
+	//close message queue
+	int mqDestroy = msgctl(msqid, IPC_RMID, NULL);
+	if (mqDestroy == -1) {
+		errorMessage(programName, " Error with msgctl command: Could not remove message queue ");
+		exit(1);
+	}	
 	
 	printf("End of program\n");
 	

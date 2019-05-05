@@ -58,6 +58,60 @@ unsigned char resetReferenceByte() {
 	return 128;
 }
 	
+int savePID(int childPID, struct page PCB[]) {
+	printf("we made it here\n");
+	int i;
+	for (i = 0; i < 18; i++) {
+		printf("Let's compare %d and %d...", PCB[i].myPID, 0);
+		if (PCB[i].myPID < 1) {
+			PCB[i].myPID = childPID;
+			return 0;
+		}
+	}
+	printf("and now we're done\n");
+	return 1;
+}	
+
+int findPIDInPCT(int PID, struct page PCB[]) {
+	int i;
+	for (i = 0; i < 18; i++) {
+				
+		if (PCB[i].myPID == PID) {
+			//this is the slot that we're in
+			return i;		
+		}
+	}
+	return -1;	
+}
+
+int getAFrame(struct frame frameTable[]) {
+	int i;
+	for (i = 0; i < 256; i++) {
+		if (frameTable[i].processStored == -1) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void printPCB(struct page PCB[]) {
+	int i, j;
+	for (i = 0; i < 18; i++) {
+		printf("%d: ", PCB[i].myPID);
+		for (j = 0; j < 32; j++) {
+			printf("%d ", PCB[i].pageTable[j]);
+		}
+		printf("\n");
+	}
+}
+
+void printFrameTable(struct frame frameTable[]) {
+	int i;
+	printf("Frame#\tDB\tRB\tProcess:Page\n");
+	for (i = 0; i < 256; i++) {
+		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+	}
+}
 
 int main(int argc, char *argv[]) {
 	
@@ -85,7 +139,7 @@ int main(int argc, char *argv[]) {
 		//preset everything to starting values
 		frameTable[i].dirtyBit = false;
 		frameTable[i].referenceByte = 0;
-		frameTable[i].processStored = frameTable[i].pageStored = 0;
+		frameTable[i].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
 		//printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 	
@@ -93,7 +147,7 @@ int main(int argc, char *argv[]) {
 		PCB[i].myPID = 0;
 		printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < 32; j++) {
-			PCB[i].pageTable[j] = -1;
+			PCB[i].pageTable[j] = -1; //we set an empty value to -1, since 0 could be a valid entry
 			printf("%d ", PCB[i].pageTable[j]);
 		}
 		printf("\n");
@@ -123,7 +177,7 @@ int main(int argc, char *argv[]) {
 	if (msqid < 0) {
 		errorMessage(programName, "Error using msgget for message queue ");
 	} else {
-		printf("We have shared memory!");
+		printf("We have message queue!\n");
 	}
 	//we are now ready to send messages whenever we desire
 	
@@ -153,6 +207,13 @@ int main(int argc, char *argv[]) {
 				//numKidsRunning += 1;
 				//write to output file the time this process was launched
 				printf("Created child %d at %d:%d\n", pid, *clockSecs, *clockNano);
+				//save this process id in the PCT
+				if (savePID(pid, PCB) == 1) {
+					errorMessage(programName, "Could not save process PID in PCB - no space available ");
+				} else {
+					printf("Process PID saved successfully\n");
+				}
+				
 				makeChild = false;
 			}
 		}
@@ -163,6 +224,42 @@ int main(int argc, char *argv[]) {
 			//we received a message
 			printf("Message received from child: %s\n", message.mesg_text);
 			printf("Process %d is request access to memory bank %d\n", message.return_address, message.mesg_value);
+			
+			//NOW WE PROCESS THIS REQUEST
+			//3 options
+				//no page fault
+				//page fault and free frame
+				//page fault and no free frame
+				
+			int ourPage = message.mesg_value / 1024;	
+				
+			
+			int result = findPIDInPCT(message.return_address, PCB);
+			if (result < 0) {
+				errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
+			}
+			
+			printf("We found that PID is stored in PCT[%d]\n", result);
+			if (PCB[result].pageTable[ourPage] > -1) {
+				//no page fault - our data is ther - handle correctly
+				printf("Our data already exists in frame #%d\n", ourPage);
+			} else {
+				//a page fault has occured. We now check if there are any frames available.
+				printf("Page fault!!\n");
+				int myFrame = getAFrame(frameTable);
+				if (myFrame == -1) {
+					//no frames available...
+					printf("and there don't appear to be any frames available...\n");
+				} else {
+					//store in this frame
+					printf("But frame %d is open for the taking!!\n", myFrame);
+				}
+			}
+			
+			//for testing, let's print values
+			printFrameTable(frameTable);
+			printPCB(PCB);
+			
 			message.mesg_type = message.return_address;
 			strncpy(message.mesg_text, "Parent to child", 100);
 			
@@ -181,6 +278,7 @@ int main(int argc, char *argv[]) {
 		}
 		
 	}
+	
 	
 	//destroy shared memory
 	printf("Parent terminating %d:%d\n", *clockSecs, *clockNano);

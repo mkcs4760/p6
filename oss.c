@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 		PCB[i].myPID = 0;
 		printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < 32; j++) {
-			PCB[i].pageTable[j] = 0;
+			PCB[i].pageTable[j] = -1;
 			printf("%d ", PCB[i].pageTable[j]);
 		}
 		printf("\n");

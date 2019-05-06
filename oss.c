@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
 		if (receive > 0) {
 			//we received a message
 			printf("Message received from child: %s\n", message.mesg_text);
-			printf("Process %d is request access to memory bank %d\n", message.return_address, message.mesg_value);
+			printf("Process %d is request access to memory bank %d\n", message.return_address, abs(message.mesg_value));
 			
 			//NOW WE PROCESS THIS REQUEST
 			//3 options
@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
 				//page fault and free frame
 				//page fault and no free frame
 				
-			int ourPage = message.mesg_value / 1024;	
+			int ourPage = abs(message.mesg_value) / 1024;	
 				
 			
 			int result = findPIDInPCT(message.return_address, PCB);
@@ -241,8 +241,11 @@ int main(int argc, char *argv[]) {
 			
 			printf("We found that PID is stored in PCT[%d]\n", result);
 			if (PCB[result].pageTable[ourPage] > -1) {
-				//no page fault - our data is ther - handle correctly
+				//no page fault - our data is there - handle correctly
 				printf("Our data already exists in frame #%d\n", ourPage);
+				
+				
+				
 			} else {
 				//a page fault has occured. We now check if there are any frames available.
 				printf("Page fault!!\n");
@@ -253,6 +256,15 @@ int main(int argc, char *argv[]) {
 				} else {
 					//store in this frame
 					printf("But frame %d is open for the taking!!\n", myFrame);
+					
+					frameTable[myFrame].referenceByte = resetReferenceByte(frameTable[myFrame].referenceByte);
+					if (message.mesg_value < 0) {
+						frameTable[myFrame].dirtyBit = true;
+					}
+					frameTable[myFrame].processStored = message.return_address;
+					frameTable[myFrame].pageStored = ourPage;
+					PCB[result].pageTable[ourPage] = myFrame; //save a link back
+					//THE ABOVE HUNK OF CODE APPEARS TO WORK
 				}
 			}
 			

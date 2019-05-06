@@ -84,6 +84,16 @@ int findPIDInPCT(int PID, struct page PCB[]) {
 	return -1;	
 }
 
+int findFrameByPage(int process, int page, struct frame frameTable[]) {
+	int i;
+	for(i = 0; i < 256; i++) {
+		if ((frameTable[i].processStored == process) && (frameTable[i].pageStored == page)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 int getAFrame(struct frame frameTable[]) {
 	int i;
 	for (i = 0; i < 256; i++) {
@@ -108,7 +118,7 @@ void printPCB(struct page PCB[]) {
 void printFrameTable(struct frame frameTable[]) {
 	int i;
 	printf("Frame#\tDB\tRB\tProcess:Page\n");
-	for (i = 0; i < 256; i++) {
+	for (i = 0; i < 40; i++) { //SHOULD BE 256, NOT 40...
 		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 }
@@ -186,6 +196,7 @@ int main(int argc, char *argv[]) {
 	bool terminate = false;
 	bool makeChild = true;
 	int temp;
+	int numMessageCalls = 0;
 	while (terminate != true) {
 		
 		*clockNano += 10000;
@@ -220,10 +231,10 @@ int main(int argc, char *argv[]) {
 		
 		int receive;
 		receive = msgrcv(msqid, &message, sizeof(message), getpid(), IPC_NOWAIT); //will wait until is receives a message
+		
 		if (receive > 0) {
 			//we received a message
-			printf("Message received from child: %s\n", message.mesg_text);
-			printf("Process %d is request access to memory bank %d\n", message.return_address, abs(message.mesg_value));
+			//printf("Message received from child: %s\n", message.mesg_text);
 			
 			//NOW WE PROCESS THIS REQUEST
 			//3 options
@@ -232,6 +243,7 @@ int main(int argc, char *argv[]) {
 				//page fault and no free frame
 				
 			int ourPage = abs(message.mesg_value) / 1024;	
+			printf("Process %d is request access to memory bank %d, which can be found in page %d\n", message.return_address, abs(message.mesg_value), ourPage);
 				
 			
 			int result = findPIDInPCT(message.return_address, PCB);
@@ -239,12 +251,24 @@ int main(int argc, char *argv[]) {
 				errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
 			}
 			
-			printf("We found that PID is stored in PCT[%d]\n", result);
+			//printf("We found that PID is stored in PCT[%d]\n", result);
 			if (PCB[result].pageTable[ourPage] > -1) {
 				//no page fault - our data is there - handle correctly
-				printf("Our data already exists in frame #%d\n", ourPage);
+				printf("Our data already exists in in frame table!!\n");
+				int myFrame = findFrameByPage(message.return_address, ourPage, frameTable);
+				if (result < 0) {
+					errorMessage(programName, "Errpr fomdomg page value in frame table. Inconsistent data ");
+				}
+				printf("We found it in frame %d\n", myFrame);
 				
-				
+				//frameTable[myFrame].
+				printf("Changing referenceByte from %d", frameTable[myFrame].referenceByte);
+				frameTable[myFrame].referenceByte = setMostSignificantBit(frameTable[myFrame].referenceByte); //make sure this works!!!
+				printf(" to %d\n", frameTable[myFrame].referenceByte);
+				if (message.mesg_value < 0) {
+					frameTable[myFrame].dirtyBit = true;
+				}
+				printf("%d\t%d\t%d\t%d:%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
 				
 			} else {
 				//a page fault has occured. We now check if there are any frames available.
@@ -252,7 +276,7 @@ int main(int argc, char *argv[]) {
 				int myFrame = getAFrame(frameTable);
 				if (myFrame == -1) {
 					//no frames available...
-					printf("and there don't appear to be any frames available...\n");
+					printf("and there don't appear to be any frames available...!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 				} else {
 					//store in this frame
 					printf("But frame %d is open for the taking!!\n", myFrame);
@@ -265,12 +289,15 @@ int main(int argc, char *argv[]) {
 					frameTable[myFrame].pageStored = ourPage;
 					PCB[result].pageTable[ourPage] = myFrame; //save a link back
 					//THE ABOVE HUNK OF CODE APPEARS TO WORK
+					
+					printf("%d\t%d\t%d\t%d:%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
+	
 				}
 			}
 			
 			//for testing, let's print values
-			printFrameTable(frameTable);
-			printPCB(PCB);
+			/*printFrameTable(frameTable);
+			printPCB(PCB);*/
 			
 			message.mesg_type = message.return_address;
 			strncpy(message.mesg_text, "Parent to child", 100);
@@ -279,6 +306,15 @@ int main(int argc, char *argv[]) {
 			int send = msgsnd(msqid, &message, sizeof(message), 0); //send message
 			if (send == -1) {
 				errorMessage(programName, "Error on msgsnd");
+			}
+
+			numMessageCalls++;
+			if (numMessageCalls % 10 == 0) {
+				printf("Shifting all referenceBytes rights...\n");
+				int i;
+				for (i = 0; i < 256; i++) {
+					frameTable[i].referenceByte = shiftRight(frameTable[i].referenceByte);
+				}
 			}
 		}
 		
@@ -291,6 +327,9 @@ int main(int argc, char *argv[]) {
 		
 	}
 	
+	//print values for testing
+	printFrameTable(frameTable);
+	printPCB(PCB);
 	
 	//destroy shared memory
 	printf("Parent terminating %d:%d\n", *clockSecs, *clockNano);

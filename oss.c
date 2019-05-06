@@ -14,6 +14,10 @@
 #include <sys/time.h>
 #include "messageQueue.h"
 
+#define PAGECOUNT 32
+#define FRAMECOUNT 16//256
+#define PROCESSCOUNT 18
+
 struct frame {
 	//a frame consists of a dirty bit, a reference byte, the process that has a page being stored here, and the page of that process that is being stored here
 	bool dirtyBit;
@@ -24,7 +28,7 @@ struct frame {
 
 struct page {
 	int myPID;
-	int pageTable[32];
+	int pageTable[PAGECOUNT];
 };
 
 //int shmid; //shared memory id, made a global so we can use it easily in errorMessage
@@ -41,6 +45,25 @@ void errorMessage(char programName[100], char errorString[100]){
 
 
 	kill(-1*getpid(), SIGKILL);
+}
+
+void printPCB(struct page PCB[]) {
+	int i, j;
+	for (i = 0; i < PROCESSCOUNT; i++) {
+		printf("%d: ", PCB[i].myPID);
+		for (j = 0; j < PAGECOUNT; j++) {
+			printf("%d ", PCB[i].pageTable[j]);
+		}
+		printf("\n");
+	}
+}
+
+void printFrameTable(struct frame frameTable[]) {
+	int i;
+	printf("Frame#\tDB\tRB\tProcess:Page\n");
+	for (i = 0; i < FRAMECOUNT; i++) { //SHOULD BE 256, NOT 40...
+		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+	}
 }
 
 unsigned char shiftRight(unsigned char value) {
@@ -61,8 +84,8 @@ unsigned char resetReferenceByte() {
 int savePID(int childPID, struct page PCB[]) {
 	printf("we made it here\n");
 	int i;
-	for (i = 0; i < 18; i++) {
-		printf("Let's compare %d and %d...", PCB[i].myPID, 0);
+	for (i = 0; i < PROCESSCOUNT; i++) {
+		//printf("Let's compare %d and %d...", PCB[i].myPID, 0);
 		if (PCB[i].myPID < 1) {
 			PCB[i].myPID = childPID;
 			return 0;
@@ -74,7 +97,7 @@ int savePID(int childPID, struct page PCB[]) {
 
 int findPIDInPCT(int PID, struct page PCB[]) {
 	int i;
-	for (i = 0; i < 18; i++) {
+	for (i = 0; i < PROCESSCOUNT; i++) {
 				
 		if (PCB[i].myPID == PID) {
 			//this is the slot that we're in
@@ -86,7 +109,7 @@ int findPIDInPCT(int PID, struct page PCB[]) {
 
 int findFrameByPage(int process, int page, struct frame frameTable[]) {
 	int i;
-	for(i = 0; i < 256; i++) {
+	for(i = 0; i < FRAMECOUNT; i++) {
 		if ((frameTable[i].processStored == process) && (frameTable[i].pageStored == page)) {
 			return i;
 		}
@@ -96,7 +119,7 @@ int findFrameByPage(int process, int page, struct frame frameTable[]) {
 
 int getAFrame(struct frame frameTable[]) {
 	int i;
-	for (i = 0; i < 256; i++) {
+	for (i = 0; i < FRAMECOUNT; i++) {
 		if (frameTable[i].processStored == -1) {
 			return i;
 		}
@@ -104,24 +127,36 @@ int getAFrame(struct frame frameTable[]) {
 	return -1;
 }
 
-void printPCB(struct page PCB[]) {
-	int i, j;
-	for (i = 0; i < 18; i++) {
-		printf("%d: ", PCB[i].myPID);
-		for (j = 0; j < 32; j++) {
-			printf("%d ", PCB[i].pageTable[j]);
+int getSmallestFrame(struct frame frameTable[]) { //untested, but makes sense
+	
+	int i;
+	int smallestFrame = -1;
+	int smallestFrameValue = 256;
+	for (i = 0; i < FRAMECOUNT; i++) {
+		//printf("SMALL FRAME: Let's compare %d and %d\n", frameTable[i].referenceByte, smallestFrameValue);
+		if (frameTable[i].referenceByte < smallestFrameValue) {
+		//int cmp = memcmp(frameTable[i].referenceByte, smallestFrameValue, 1);
+		//if (cmp < 0);
+			smallestFrame = i;
+			smallestFrameValue = frameTable[i].referenceByte;
 		}
-		printf("\n");
 	}
+	return smallestFrame;
 }
 
-void printFrameTable(struct frame frameTable[]) {
+int clearPage(int myProcess, int myPage, struct page PCB[]) {
 	int i;
-	printf("Frame#\tDB\tRB\tProcess:Page\n");
-	for (i = 0; i < 40; i++) { //SHOULD BE 256, NOT 40...
-		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+	for (i = 0; i < PROCESSCOUNT; i++) {
+		//printf("Let's compare %d and %d...\n", PCB[i].myPID, myProcess);
+		if (PCB[i].myPID == myProcess) {
+			PCB[i].pageTable[myPage] = -1;
+			return 0;
+		}
 	}
+	return -1;
 }
+
+
 
 int main(int argc, char *argv[]) {
 	
@@ -135,17 +170,17 @@ int main(int argc, char *argv[]) {
 	printf("Welcome to Project 6\n");
 	
 	//we will need a frame table, as well as 18 page tables
-	struct frame frameTable[256];
+	struct frame frameTable[FRAMECOUNT];
 	//int page[32]; //each process has 32 pages of memory
 	//int page[32] pageTable[18];
 	
 	//each process needs an array of 32 ints
-	struct page PCB[18];
+	struct page PCB[PROCESSCOUNT];
 	
 	
 	int i, j;
 	//printf("Frame#\tDB\tRB\tProcess:Page\n");
-	for (i = 0; i < 256; i++) {
+	for (i = 0; i < FRAMECOUNT; i++) {
 		//preset everything to starting values
 		frameTable[i].dirtyBit = false;
 		frameTable[i].referenceByte = 0;
@@ -153,10 +188,10 @@ int main(int argc, char *argv[]) {
 		//printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 	
-	for (i = 0; i < 18; i++) {
+	for (i = 0; i < PROCESSCOUNT; i++) {
 		PCB[i].myPID = 0;
 		printf("%d: ", PCB[i].myPID);
-		for (j = 0; j < 32; j++) {
+		for (j = 0; j < PAGECOUNT; j++) {
 			PCB[i].pageTable[j] = -1; //we set an empty value to -1, since 0 could be a valid entry
 			printf("%d ", PCB[i].pageTable[j]);
 		}
@@ -277,6 +312,46 @@ int main(int argc, char *argv[]) {
 				if (myFrame == -1) {
 					//no frames available...
 					printf("and there don't appear to be any frames available...!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+					//find the one with the smallest referenceByte and swap it outp
+					
+					//printFrameTable(frameTable);
+					int smallestFrame = getSmallestFrame(frameTable);
+					//this is the frame we want to swap outp
+					printf("We believe that frame #%d has the smallest referencyByte and therfore should be swapped out\n", smallestFrame);
+					
+					//first we need to clear it from it's page table
+					int result = clearPage(frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored, PCB);
+					if (result < 0) {
+						errorMessage(programName, "Failed to find page. Unable to remove it and satisfy page fault ");
+					}
+					//increment clock, more if the dirty bit was set
+					if (frameTable[smallestFrame].dirtyBit) {
+						*clockNano += 50000;
+					} else {
+						*clockNano += 20000;
+					}
+					if (*clockNano >= 1000000000) { //increment the next unit
+						*clockSecs += 1;
+						*clockNano -= 1000000000;
+					}
+					
+					//now we need to clear it in the frame table
+					
+					frameTable[smallestFrame].dirtyBit = false;
+					frameTable[smallestFrame].referenceByte = 0;
+					frameTable[smallestFrame].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
+					
+					//now we need to save our value in frame table
+					frameTable[smallestFrame].referenceByte = resetReferenceByte(frameTable[smallestFrame].referenceByte);
+					if (message.mesg_value < 0) {
+						frameTable[smallestFrame].dirtyBit = true;
+					}
+					frameTable[smallestFrame].processStored = message.return_address;
+					frameTable[smallestFrame].pageStored = ourPage;
+					PCB[result].pageTable[ourPage] = smallestFrame; //save a link back
+					//THIS NEEDS TO BE TESTED!!!
+					
+					
 				} else {
 					//store in this frame
 					printf("But frame %d is open for the taking!!\n", myFrame);
@@ -312,7 +387,7 @@ int main(int argc, char *argv[]) {
 			if (numMessageCalls % 10 == 0) {
 				printf("Shifting all referenceBytes rights...\n");
 				int i;
-				for (i = 0; i < 256; i++) {
+				for (i = 0; i < FRAMECOUNT; i++) {
 					frameTable[i].referenceByte = shiftRight(frameTable[i].referenceByte);
 				}
 			}

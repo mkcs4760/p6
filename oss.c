@@ -15,7 +15,7 @@
 #include "messageQueue.h"
 
 #define PAGECOUNT 32
-#define FRAMECOUNT 16//256
+#define FRAMECOUNT 32//256
 #define PROCESSCOUNT 18
 
 struct frame {
@@ -257,6 +257,8 @@ int main(int argc, char *argv[]) {
 	bool makeChild = true;
 	int temp;
 	int numMessageCalls = 0;
+	int processesCalled = 0;
+	int processesRunning = 0;
 	while (terminate != true) {
 		
 		*clockNano += 10000;
@@ -284,8 +286,13 @@ int main(int argc, char *argv[]) {
 				} else {
 					printf("Process PID saved successfully\n");
 				}
-				
+				processesCalled++;
+				processesRunning++;
 				makeChild = false;
+			}
+		} else {
+			if (processesCalled < 2) {
+				makeChild = true;
 			}
 		}
 		
@@ -422,8 +429,11 @@ int main(int argc, char *argv[]) {
 			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
 			//deallocate all values
 			clearProcessMemory(temp, PCB, frameTable, programName);
+			processesRunning--;
+			if (processesCalled == 2 && processesRunning == 0) {
+				terminate = true;
+			}
 			
-			terminate = true;
 		}
 		
 	}

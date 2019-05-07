@@ -60,9 +60,9 @@ void printPCB(struct page PCB[]) {
 
 void printFrameTable(struct frame frameTable[]) {
 	int i;
-	printf("Frame#\tDB\tRB\tProcess:Page\n");
+	printf("Frame#\tDB\tRB\tProcess\tPage\n");
 	for (i = 0; i < FRAMECOUNT; i++) { //SHOULD BE 256, NOT 40...
-		printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+		printf("%d\t%d\t%d\t%d\t%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 }
 
@@ -82,7 +82,7 @@ unsigned char resetReferenceByte() {
 }
 	
 int savePID(int childPID, struct page PCB[]) {
-	printf("we made it here\n");
+	//printf("we made it here\n");
 	int i;
 	for (i = 0; i < PROCESSCOUNT; i++) {
 		//printf("Let's compare %d and %d...", PCB[i].myPID, 0);
@@ -91,7 +91,7 @@ int savePID(int childPID, struct page PCB[]) {
 			return 0;
 		}
 	}
-	printf("and now we're done\n");
+	//printf("and now we're done\n");
 	return 1;
 }	
 
@@ -190,12 +190,12 @@ int main(int argc, char *argv[]) {
 	
 	for (i = 0; i < PROCESSCOUNT; i++) {
 		PCB[i].myPID = 0;
-		printf("%d: ", PCB[i].myPID);
+		//printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < PAGECOUNT; j++) {
 			PCB[i].pageTable[j] = -1; //we set an empty value to -1, since 0 could be a valid entry
-			printf("%d ", PCB[i].pageTable[j]);
+			//printf("%d ", PCB[i].pageTable[j]);
 		}
-		printf("\n");
+		//printf("\n");
 	}
 	
 	key_t smKey = 1094;
@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
 	*clockSecs = 0;
 	*clockNano = 0;
 	
-	printf("We've got shared memory!\n");
+	//printf("We've got shared memory!\n");
 	
 	//now message queue
 	key_t mqKey = 2094;
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
 	if (msqid < 0) {
 		errorMessage(programName, "Error using msgget for message queue ");
 	} else {
-		printf("We have message queue!\n");
+		//printf("We have message queue!\n");
 	}
 	//we are now ready to send messages whenever we desire
 	
@@ -276,10 +276,9 @@ int main(int argc, char *argv[]) {
 				//no page fault
 				//page fault and free frame
 				//page fault and no free frame
-				
+			printf("\n");	
 			int ourPage = abs(message.mesg_value) / 1024;	
 			printf("Process %d is request access to memory bank %d, which can be found in page %d\n", message.return_address, abs(message.mesg_value), ourPage);
-				
 			
 			int result = findPIDInPCT(message.return_address, PCB);
 			if (result < 0) {
@@ -303,7 +302,7 @@ int main(int argc, char *argv[]) {
 				if (message.mesg_value < 0) {
 					frameTable[myFrame].dirtyBit = true;
 				}
-				printf("%d\t%d\t%d\t%d:%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
+				printf("%d\t%d\t%d\t%d\t%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
 				
 			} else {
 				//a page fault has occured. We now check if there are any frames available.
@@ -311,7 +310,7 @@ int main(int argc, char *argv[]) {
 				int myFrame = getAFrame(frameTable);
 				if (myFrame == -1) {
 					//no frames available...
-					printf("and there don't appear to be any frames available...!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+					printf("and there don't appear to be any frames available...\n");
 					//find the one with the smallest referenceByte and swap it outp
 					
 					//printFrameTable(frameTable);
@@ -384,7 +383,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			numMessageCalls++;
-			if (numMessageCalls % 10 == 0) {
+			if (numMessageCalls % 10 == 0) { //shift every 10 message calls - NOTE THIS SHOULD PROBABLY BE A SEPARATE FUNCTION!!!
 				printf("Shifting all referenceBytes rights...\n");
 				int i;
 				for (i = 0; i < FRAMECOUNT; i++) {
@@ -392,7 +391,6 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
-		
 		
 		temp = waitpid(-1, NULL, WNOHANG);
 		if (temp > 0) {

@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 	}
 	
 	
-	printf("Child %d is alive!!\n", getpid());
+	//printf("Child %d is alive!!\n", getpid());
 	
 	int shmid;
 	key_t key = 1094;
@@ -70,11 +70,11 @@ int main(int argc, char *argv[]) {
 	int terminate = 0;
 	while (terminate != 33) {
 		int memoryRequest = randomNum(0, 32000);
-		printf("We have a memory request for %d\n", memoryRequest);
+		//printf("We have a memory request for %d\n", memoryRequest);
 		if (randomNum(1, 10) < 4) {
 			//it's a write call
 			memoryRequest = memoryRequest * -1; //negative values are write calls, while positive are read calls
-			printf("CHILD: Let's make that a write request\n");
+			//printf("CHILD: Let's make that a write request\n");
 		} else {
 			//it's a read call
 		}
@@ -88,18 +88,18 @@ int main(int argc, char *argv[]) {
 		if (send == -1) {
 			perror("Error on msgsnd\n");
 		}
-		printf("CHILD: %d sent message --- awaiting response...\n", getpid());
+		//printf("CHILD: %d sent message --- awaiting response...\n", getpid());
 		int receive;
 		receive = msgrcv(msqid, &message, sizeof(message), getpid(), 0); //will wait until is receives a message
 		if (receive < 0) {
 			perror("No message received\n");
 		}
-		printf("CHILD: Data Received is: %s \n", message.mesg_text);
-		printf("\n");
+		//printf("CHILD: Data Received is: %s \n", message.mesg_text);
+		//printf("\n");
 		terminate++;
 	}
 
 	
-	printf("Child %d is shutting down at time %d:%d\n", getpid(), *clockSecs, *clockNano);
+	//printf("Child %d is shutting down at time %d:%d\n", getpid(), *clockSecs, *clockNano);
 	return 0;
 }

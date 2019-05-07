@@ -74,6 +74,10 @@ void printFrameTable(struct frame frameTable[]) {
 	printf("Frame#\tDB\tRB\tProcess\tPage\n");
 	for (i = 0; i < FRAMECOUNT; i++) { //SHOULD BE 256, NOT 40...
 		printf("%d\t%d\t%d\t%d\t%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
+		if (frameTable[i].pageStored == -1 && frameTable[i].processStored != -1) {  //TESTING!!
+			printf("ERROR!! -1 value found in frameTable!!\n");
+			kill(-1*getpid(), SIGKILL);
+		}
 	}
 }
 
@@ -188,6 +192,7 @@ void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[
 			frameTable[i].dirtyBit = false;
 			frameTable[i].referenceByte = 0;
 			frameTable[i].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
+			printf("ATTENTION!! Just set frameTable[%d].pageStored to -1\n", i); //TESTING
 		}
 	}
 	//this should be cleared, double check to be sure
@@ -278,7 +283,7 @@ int main(int argc, char *argv[]) {
 	int numPageFaults = 0;
 	int numFullPageHits = 0;
 	while (terminate != true) {
-		printPCB(PCB); //these next two lines are ONLY FOR TROUBLESHOOTING!!!
+		//printPCB(PCB); //these next two lines are ONLY FOR TROUBLESHOOTING!!!
 		checkOurPIDS(PCB, programName);
 		
 		*clockNano += 10000;
@@ -368,7 +373,7 @@ int main(int argc, char *argv[]) {
 					printf("and there don't appear to be any frames available...\n");
 					numFullPageHits++;
 					//find the one with the smallest referenceByte and swap it outp
-					
+					printFrameTable(frameTable);
 					//printFrameTable(frameTable);
 					int smallestFrame = getSmallestFrame(frameTable);
 					//this is the frame we want to swap outp
@@ -394,9 +399,11 @@ int main(int argc, char *argv[]) {
 					
 					//now we need to clear it in the frame table
 					
+					
 					frameTable[smallestFrame].dirtyBit = false;
-					frameTable[smallestFrame].referenceByte = 0;
-					frameTable[smallestFrame].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
+					//frameTable[smallestFrame].referenceByte = 0;
+					//frameTable[smallestFrame].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
+					//printf("ATTENTION2!! Just set frameTable[%d].pageStored to -1\n", i); //TESTING
 					
 					//now we need to save our value in frame table
 					frameTable[smallestFrame].referenceByte = resetReferenceByte(frameTable[smallestFrame].referenceByte);
@@ -405,6 +412,7 @@ int main(int argc, char *argv[]) {
 					}
 					frameTable[smallestFrame].processStored = message.return_address;
 					frameTable[smallestFrame].pageStored = ourPage;
+					printf("ATTENTION3!! Just set frameTable[%d].pageStored to %d\n", i, ourPage); //TESTING
 					PCB[result].pageTable[ourPage] = smallestFrame; //save a link back
 					//THIS NEEDS TO BE TESTED!!!
 					
@@ -419,6 +427,7 @@ int main(int argc, char *argv[]) {
 					}
 					frameTable[myFrame].processStored = message.return_address;
 					frameTable[myFrame].pageStored = ourPage;
+					printf("ATTENTION4!! Just set frameTable[%d].pageStored to %d\n", i, ourPage); //TESTING
 					PCB[result].pageTable[ourPage] = myFrame; //save a link back
 					//THE ABOVE HUNK OF CODE APPEARS TO WORK
 					
@@ -452,8 +461,6 @@ int main(int argc, char *argv[]) {
 		
 		temp = waitpid(-1, NULL, WNOHANG);
 		if (temp > 0) {
-			printFrameTable(frameTable);
-			printPCB(PCB);
 			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
 			//deallocate all values
 			clearProcessMemory(temp, PCB, frameTable, programName);

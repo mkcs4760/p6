@@ -156,7 +156,32 @@ int clearPage(int myProcess, int myPage, struct page PCB[]) {
 	return -1;
 }
 
-
+void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[], char programName[100]) {
+	printf("Before clearing...\n");
+	printPCB(PCB);
+	printFrameTable(frameTable);
+	int result = findPIDInPCT(process, PCB);
+	if (result < 0) {
+		errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
+	}
+	PCB[result].myPID = 0;
+	int i;
+	for (i = 0; i < PAGECOUNT; i++) {
+		PCB[result].pageTable[i] = -1; //we set an empty value to -1, since 0 could be a valid entry
+	}
+	//now clear frame table
+	for (i = 0; i < FRAMECOUNT; i++) {
+		if (frameTable[i].processStored == process) {
+			frameTable[i].dirtyBit = false;
+			frameTable[i].referenceByte = 0;
+			frameTable[i].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
+		}
+	}
+	//this should be cleared, double check to be sure
+	printf("Process %d has been removed from the system\n", process);
+	printPCB(PCB);
+	printFrameTable(frameTable);
+}
 
 int main(int argc, char *argv[]) {
 	
@@ -395,6 +420,9 @@ int main(int argc, char *argv[]) {
 		temp = waitpid(-1, NULL, WNOHANG);
 		if (temp > 0) {
 			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
+			//deallocate all values
+			clearProcessMemory(temp, PCB, frameTable, programName);
+			
 			terminate = true;
 		}
 		

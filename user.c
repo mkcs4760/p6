@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
 	
 	//sleep(2);
 	int terminate = 0;
-	while (terminate != 33) {
+	while (terminate != 1) {
 		int memoryRequest = randomNum(0, 32000);
 		//printf("We have a memory request for %d\n", memoryRequest);
 		if (randomNum(1, 10) < 4) {
@@ -96,7 +96,11 @@ int main(int argc, char *argv[]) {
 		}
 		//printf("CHILD: Data Received is: %s \n", message.mesg_text);
 		//printf("\n");
-		terminate++;
+		//terminate++;
+		
+		if (randomNum(1, 100) > 90) {
+			terminate = 1; //1% chance of terminating
+		}
 	}
 
 	

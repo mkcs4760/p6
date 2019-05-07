@@ -15,7 +15,7 @@
 #include "messageQueue.h"
 
 #define PAGECOUNT 32
-#define FRAMECOUNT 32//256
+#define FRAMECOUNT 256
 #define PROCESSCOUNT 18
 
 struct frame {
@@ -58,6 +58,17 @@ void printPCB(struct page PCB[]) {
 	}
 }
 
+void checkOurPIDS(struct page PCB[], char programName[200]) { //THIS IS FOR TROUBLESHOOTING ONLY!!!
+	int i;
+	for (i = 0; i < PROCESSCOUNT; i++) {
+		if (PCB[i].myPID == -1) {
+			printf("ERROR!! -1 value found within PCB[%d].myPID!\n", i);
+			printf("Something just happened to cause this...");
+			errorMessage(programName, "we're killing early ");
+		}
+	}
+}
+
 void printFrameTable(struct frame frameTable[]) {
 	int i;
 	printf("Frame#\tDB\tRB\tProcess\tPage\n");
@@ -81,13 +92,14 @@ unsigned char resetReferenceByte() {
 	return 128;
 }
 	
-int savePID(int childPID, struct page PCB[]) {
+int savePID(int childPID, struct page PCB[], FILE * output) {
 	//printf("we made it here\n");
 	int i;
 	for (i = 0; i < PROCESSCOUNT; i++) {
 		//printf("Let's compare %d and %d...", PCB[i].myPID, 0);
 		if (PCB[i].myPID < 1) {
 			PCB[i].myPID = childPID;
+			fprintf(output, "!!!Setting pid to %d!!!\n", childPID);
 			return 0;
 		}
 	}
@@ -147,7 +159,7 @@ int getSmallestFrame(struct frame frameTable[]) { //untested, but makes sense
 int clearPage(int myProcess, int myPage, struct page PCB[]) {
 	int i;
 	for (i = 0; i < PROCESSCOUNT; i++) {
-		//printf("Let's compare %d and %d...\n", PCB[i].myPID, myProcess);
+		printf("Let's compare %d and %d...\n", PCB[i].myPID, myProcess);
 		if (PCB[i].myPID == myProcess) {
 			PCB[i].pageTable[myPage] = -1;
 			return 0;
@@ -157,11 +169,12 @@ int clearPage(int myProcess, int myPage, struct page PCB[]) {
 }
 
 void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[], char programName[100]) {
-	printf("Before clearing...\n");
-	printPCB(PCB);
-	printFrameTable(frameTable);
+	//printf("Before clearing...\n");
+	//printPCB(PCB);
+	//printFrameTable(frameTable);
 	int result = findPIDInPCT(process, PCB);
 	if (result < 0) {
+		printPCB(PCB);
 		errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
 	}
 	PCB[result].myPID = 0;
@@ -178,9 +191,9 @@ void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[
 		}
 	}
 	//this should be cleared, double check to be sure
-	printf("Process %d has been removed from the system\n", process);
-	printPCB(PCB);
-	printFrameTable(frameTable);
+	//printf("Process %d has been removed from the system\n", process);
+	//printPCB(PCB);
+	//printFrameTable(frameTable);
 }
 
 int main(int argc, char *argv[]) {
@@ -251,6 +264,9 @@ int main(int argc, char *argv[]) {
 	}
 	//we are now ready to send messages whenever we desire
 	
+	FILE * output;
+	output = fopen("errorLog.txt", "w");
+	fprintf(output, "Error cases...\n\n");
 	
 	
 	bool terminate = false;
@@ -259,7 +275,11 @@ int main(int argc, char *argv[]) {
 	int numMessageCalls = 0;
 	int processesCalled = 0;
 	int processesRunning = 0;
+	int numPageFaults = 0;
+	int numFullPageHits = 0;
 	while (terminate != true) {
+		printPCB(PCB); //these next two lines are ONLY FOR TROUBLESHOOTING!!!
+		checkOurPIDS(PCB, programName);
 		
 		*clockNano += 10000;
 		if (*clockNano >= 1000000000) { //increment the next unit
@@ -281,7 +301,7 @@ int main(int argc, char *argv[]) {
 				//write to output file the time this process was launched
 				printf("Created child %d at %d:%d\n", pid, *clockSecs, *clockNano);
 				//save this process id in the PCT
-				if (savePID(pid, PCB) == 1) {
+				if (savePID(pid, PCB, output) == 1) {
 					errorMessage(programName, "Could not save process PID in PCB - no space available ");
 				} else {
 					printf("Process PID saved successfully\n");
@@ -291,7 +311,7 @@ int main(int argc, char *argv[]) {
 				makeChild = false;
 			}
 		} else {
-			if (processesCalled < 2) {
+			if (processesCalled < PROCESSCOUNT) {
 				makeChild = true;
 			}
 		}
@@ -314,6 +334,8 @@ int main(int argc, char *argv[]) {
 			
 			int result = findPIDInPCT(message.return_address, PCB);
 			if (result < 0) {
+				printPCB(PCB);
+				fclose(output);
 				errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
 			}
 			
@@ -339,16 +361,20 @@ int main(int argc, char *argv[]) {
 			} else {
 				//a page fault has occured. We now check if there are any frames available.
 				printf("Page fault!!\n");
+				numPageFaults++;
 				int myFrame = getAFrame(frameTable);
 				if (myFrame == -1) {
 					//no frames available...
 					printf("and there don't appear to be any frames available...\n");
+					numFullPageHits++;
 					//find the one with the smallest referenceByte and swap it outp
 					
 					//printFrameTable(frameTable);
 					int smallestFrame = getSmallestFrame(frameTable);
 					//this is the frame we want to swap outp
 					printf("We believe that frame #%d has the smallest referencyByte and therfore should be swapped out\n", smallestFrame);
+					printf("Frame 18 references process:page combo %d:%d\n", frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored);
+					printFrameTable(frameTable);
 					
 					//first we need to clear it from it's page table
 					int result = clearPage(frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored, PCB);
@@ -426,11 +452,13 @@ int main(int argc, char *argv[]) {
 		
 		temp = waitpid(-1, NULL, WNOHANG);
 		if (temp > 0) {
+			printFrameTable(frameTable);
+			printPCB(PCB);
 			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
 			//deallocate all values
 			clearProcessMemory(temp, PCB, frameTable, programName);
 			processesRunning--;
-			if (processesCalled == 2 && processesRunning == 0) {
+			if (processesCalled == PROCESSCOUNT && processesRunning == 0) {
 				terminate = true;
 			}
 			
@@ -442,6 +470,12 @@ int main(int argc, char *argv[]) {
 	printFrameTable(frameTable);
 	printPCB(PCB);
 	
+	fprintf(output, "\nEnd of log\n");
+	
+	fclose(output);
+	
+	printf("We handled %d page faults in this simulation\n", numPageFaults);
+	printf("Our page table was full %d times\n", numFullPageHits);
 	//destroy shared memory
 	printf("Parent terminating %d:%d\n", *clockSecs, *clockNano);
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);

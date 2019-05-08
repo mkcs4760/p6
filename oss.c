@@ -16,7 +16,8 @@
 
 #define PAGECOUNT 32
 #define FRAMECOUNT 256
-#define PROCESSCOUNT 18
+
+int totalProcessesToLaunch = 18;
 
 struct frame {
 	//a frame consists of a dirty bit, a reference byte, the process that has a page being stored here, and the page of that process that is being stored here
@@ -29,6 +30,9 @@ struct frame {
 struct page {
 	int myPID;
 	int pageTable[PAGECOUNT];
+	int numMemoryAccesses;
+	int memoryAccessSecs;
+	int memoryAccessNano;
 };
 
 //int shmid; //shared memory id, made a global so we can use it easily in errorMessage
@@ -49,7 +53,7 @@ void errorMessage(char programName[100], char errorString[100]){
 
 void printPCB(struct page PCB[]) {
 	int i, j;
-	for (i = 0; i < PROCESSCOUNT; i++) {
+	for (i = 0; i < totalProcessesToLaunch; i++) {
 		printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < PAGECOUNT; j++) {
 			printf("%d ", PCB[i].pageTable[j]);
@@ -60,7 +64,7 @@ void printPCB(struct page PCB[]) {
 
 void checkOurPIDS(struct page PCB[], char programName[200]) { //THIS IS FOR TROUBLESHOOTING ONLY!!!
 	int i;
-	for (i = 0; i < PROCESSCOUNT; i++) {
+	for (i = 0; i < totalProcessesToLaunch; i++) {
 		if (PCB[i].myPID == -1) {
 			printf("ERROR!! -1 value found within PCB[%d].myPID!\n", i);
 			printf("Something just happened to cause this...");
@@ -99,7 +103,7 @@ unsigned char resetReferenceByte() {
 int savePID(int childPID, struct page PCB[], FILE * output) {
 	//printf("we made it here\n");
 	int i;
-	for (i = 0; i < PROCESSCOUNT; i++) {
+	for (i = 0; i < totalProcessesToLaunch; i++) {
 		//printf("Let's compare %d and %d...", PCB[i].myPID, 0);
 		if (PCB[i].myPID < 1) {
 			PCB[i].myPID = childPID;
@@ -113,7 +117,7 @@ int savePID(int childPID, struct page PCB[], FILE * output) {
 
 int findPIDInPCT(int PID, struct page PCB[]) {
 	int i;
-	for (i = 0; i < PROCESSCOUNT; i++) {
+	for (i = 0; i < totalProcessesToLaunch; i++) {
 				
 		if (PCB[i].myPID == PID) {
 			//this is the slot that we're in
@@ -162,7 +166,7 @@ int getSmallestFrame(struct frame frameTable[]) { //untested, but makes sense
 
 int clearPage(int myProcess, int myPage, struct page PCB[]) {
 	int i;
-	for (i = 0; i < PROCESSCOUNT; i++) {
+	for (i = 0; i < totalProcessesToLaunch; i++) {
 		printf("Let's compare %d and %d...\n", PCB[i].myPID, myProcess);
 		if (PCB[i].myPID == myProcess) {
 			PCB[i].pageTable[myPage] = -1;
@@ -186,6 +190,7 @@ void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[
 	for (i = 0; i < PAGECOUNT; i++) {
 		PCB[result].pageTable[i] = -1; //we set an empty value to -1, since 0 could be a valid entry
 	}
+	PCB[result].numMemoryAccesses = PCB[result].memoryAccessSecs = PCB[result].memoryAccessNano = 0; //this should set all 3 values to 0 in one line of code
 	//now clear frame table
 	for (i = 0; i < FRAMECOUNT; i++) {
 		if (frameTable[i].processStored == process) {
@@ -210,6 +215,34 @@ int main(int argc, char *argv[]) {
 		memmove(programName, programName + 2, strlen(programName));
 	}
 	
+	//first we process the getopt arguments
+	int option;
+	while ((option = getopt(argc, argv, "hn:")) != -1) {
+		switch (option) {
+			case 'h' :	printf("Help page for OS_Klein_project6\n"); //for h, we print data to the screen
+						printf("Consists of the following:\n\tTwo .c file titled oss.c and user.c\n\tOne .h file titled messageQueue.h\n\tOne Makefile\n\tOne README.md file\n\tOne version control log.\n");
+						printf("The command 'make' will run the makefile and compile the program\n");
+						printf("Command line arguments for oss executable:\n");
+						printf("\t-n\t<maxTotalChildren>\tdefaults to 18\n");
+						printf("\t-h\t<NoArgument>\n");
+						printf("Version control acomplished using github. Log obtained using command 'git log > versionLog.txt\n");
+						exit(0);
+						break;
+			case 'n' :	if (atoi(optarg) <= 19) { //for s, we set the maximum of child processes we will have at a time
+							totalProcessesToLaunch = atoi(optarg);
+						}
+						else {
+							errno = 22;
+							errorMessage(programName, "Cannot allow more then 19 process at a time. "); //the parent is running, so there's already 1 process running
+						}
+						break;
+			default :	errno = 22; //anything else is an invalid argument
+						errorMessage(programName, "You entered an invalid argument. ");
+		}
+	}
+	
+	
+	
 	printf("Welcome to Project 6\n");
 	
 	//we will need a frame table, as well as 18 page tables
@@ -218,7 +251,7 @@ int main(int argc, char *argv[]) {
 	//int page[32] pageTable[18];
 	
 	//each process needs an array of 32 ints
-	struct page PCB[PROCESSCOUNT];
+	struct page PCB[totalProcessesToLaunch];
 	
 	
 	int i, j;
@@ -231,13 +264,14 @@ int main(int argc, char *argv[]) {
 		//printf("%d\t%d\t%d\t%d:%d\n", i, frameTable[i].dirtyBit, frameTable[i].referenceByte, frameTable[i].processStored, frameTable[i].pageStored);
 	}
 	
-	for (i = 0; i < PROCESSCOUNT; i++) {
+	for (i = 0; i < totalProcessesToLaunch; i++) {
 		PCB[i].myPID = 0;
 		//printf("%d: ", PCB[i].myPID);
 		for (j = 0; j < PAGECOUNT; j++) {
 			PCB[i].pageTable[j] = -1; //we set an empty value to -1, since 0 could be a valid entry
 			//printf("%d ", PCB[i].pageTable[j]);
 		}
+		PCB[i].numMemoryAccesses = PCB[i].memoryAccessSecs = PCB[i].memoryAccessNano = 0; //this should set all 3 values to 0 in one line of code
 		//printf("\n");
 	}
 	
@@ -316,7 +350,7 @@ int main(int argc, char *argv[]) {
 				makeChild = false;
 			}
 		} else {
-			if (processesCalled < PROCESSCOUNT) {
+			if (processesCalled < totalProcessesToLaunch) {
 				makeChild = true;
 			}
 		}
@@ -465,7 +499,7 @@ int main(int argc, char *argv[]) {
 			//deallocate all values
 			clearProcessMemory(temp, PCB, frameTable, programName);
 			processesRunning--;
-			if (processesCalled == PROCESSCOUNT && processesRunning == 0) {
+			if (processesCalled == totalProcessesToLaunch && processesRunning == 0) {
 				terminate = true;
 			}
 			

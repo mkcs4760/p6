@@ -73,7 +73,6 @@ int main(int argc, char *argv[]) {
 		}
 		
 		message.mesg_type = getppid();
-		//strncpy(message.mesg_text, "child to parent", 100);
 		message.mesg_value = memoryRequest;
 		message.return_address = getpid();
 		
@@ -81,15 +80,11 @@ int main(int argc, char *argv[]) {
 		if (send == -1) {
 			perror("Error on msgsnd\n");
 		}
-		//printf("CHILD: %d sent message --- awaiting response...\n", getpid());
 		int receive;
 		receive = msgrcv(msqid, &message, sizeof(message), getpid(), 0); //will wait until is receives a message
 		if (receive < 0) {
 			perror("No message received\n");
 		}
-		//printf("CHILD: Data Received is: %s \n", message.mesg_text);
-		//printf("\n");
-		//terminate++;
 		loopCount++;
 		
 		if ((randomNum(1, 100) > 98) & (loopCount > 20)) {

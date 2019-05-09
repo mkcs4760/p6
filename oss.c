@@ -199,7 +199,7 @@ void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[
 			frameTable[i].dirtyBit = false;
 			frameTable[i].referenceByte = 0;
 			frameTable[i].processStored = frameTable[i].pageStored = -1; //-1 means empty, since 0 is a valid entry
-			printf("ATTENTION!! Just set frameTable[%d].pageStored to -1\n", i); //TESTING
+			//printf("ATTENTION!! Just set frameTable[%d].pageStored to -1\n", i); //TESTING
 		}
 	}
 	//this should be cleared, double check to be sure
@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
 				//no page fault
 				//page fault and free frame
 				//page fault and no free frame
-			printf("\n");	
+			//printf("\n");	
 			int ourPage = abs(message.mesg_value) / 1024;	
 			if (message.mesg_value < 0) {
 				printf("%s: Process %d requesting write of address %d, which can be found in page %d, at %d:%d\n", programName, message.return_address, abs(message.mesg_value), ourPage, *clockSecs, *clockNano);	
@@ -423,16 +423,16 @@ int main(int argc, char *argv[]) {
 				int myFrame = getAFrame(frameTable);
 				if (myFrame == -1) {
 					//no frames available...
-					printf("and there don't appear to be any frames available...\n");
+					//printf("and there don't appear to be any frames available...\n");
 					numFullPageHits++;
 					//find the one with the smallest referenceByte and swap it outp
-					printFrameTable(frameTable);
+					//printFrameTable(frameTable);
 					//printFrameTable(frameTable);
 					int smallestFrame = getSmallestFrame(frameTable);
 					//this is the frame we want to swap outp
-					printf("We believe that frame #%d has the smallest referencyByte and therfore should be swapped out\n", smallestFrame);
-					printf("Frame 18 references process:page combo %d:%d\n", frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored);
-					printFrameTable(frameTable);
+					//printf("We believe that frame #%d has the smallest referencyByte and therfore should be swapped out\n", smallestFrame);
+					//printf("Frame 18 references process:page combo %d:%d\n", frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored);
+					//printFrameTable(frameTable);
 					
 					//first we need to clear it from it's page table
 					if (clearPage(frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored, PCB) < 0) {
@@ -455,6 +455,10 @@ int main(int argc, char *argv[]) {
 						PCB[result].memoryAccessNano -= 1000000000;
 					}
 					
+					printf("%s: No frames are free. Clearing frame %d and swapping in process #%d page %d\n", programName, smallestFrame, message.return_address, ourPage); //validate that htis is correct!!!
+					
+					
+					
 					//now we need to clear it in the frame table
 					
 					
@@ -466,18 +470,18 @@ int main(int argc, char *argv[]) {
 					//now we need to save our value in frame table
 					frameTable[smallestFrame].referenceByte = resetReferenceByte(frameTable[smallestFrame].referenceByte);
 					if (message.mesg_value < 0) {
+						printf("%s: Dirty bit of frame %d set, adding additional time to the clock\n", programName, smallestFrame);
 						frameTable[smallestFrame].dirtyBit = true;
 					}
 					frameTable[smallestFrame].processStored = message.return_address;
 					frameTable[smallestFrame].pageStored = ourPage;
-					printf("ATTENTION3!! Just set frameTable[%d].pageStored to %d\n", i, ourPage); //TESTING
+					//printf("ATTENTION3!! Just set frameTable[%d].pageStored to %d\n", i, ourPage); //TESTING
 					PCB[result].pageTable[ourPage] = smallestFrame; //save a link back
 					//THIS NEEDS TO BE TESTED!!!
-					
-					
+					printf("%s: Granting data back to %d at %d:%d\n", programName, message.return_address, *clockSecs, *clockNano);
 				} else {
 					//store in this frame
-					printf("But frame %d is open for the taking!!\n", myFrame);
+					//printf("But frame %d is open for the taking!!\n", myFrame);
 					
 					*clockNano += 10000;
 					PCB[result].memoryAccessNano += 10000;
@@ -490,7 +494,7 @@ int main(int argc, char *argv[]) {
 						PCB[result].memoryAccessNano -= 1000000000;
 					}
 					
-					printf("%s: Address %d written to frame %d at %d:%d\n", programName, abs(message.mesg_value), myFrame, *clockSecs, *clockNano);
+					printf("%s: Frame %d is empty. Address %d written to to that frame at %d:%d\n", programName, myFrame, abs(message.mesg_value), *clockSecs, *clockNano);
 			
 					
 					frameTable[myFrame].referenceByte = resetReferenceByte(frameTable[myFrame].referenceByte);
@@ -503,7 +507,7 @@ int main(int argc, char *argv[]) {
 					PCB[result].pageTable[ourPage] = myFrame; //save a link back
 					//THE ABOVE HUNK OF CODE APPEARS TO WORK
 					
-					printf("%d\t%d\t%d\t%d:%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
+					//printf("%d\t%d\t%d\t%d:%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
 	
 				}
 			}
@@ -522,8 +526,8 @@ int main(int argc, char *argv[]) {
 			}
 
 			numMessageCalls++;
-			if (numMessageCalls % 10 == 0) { //shift every 10 message calls - NOTE THIS SHOULD PROBABLY BE A SEPARATE FUNCTION!!!
-				printf("Shifting all referenceBytes rights...\n");
+			if (numMessageCalls % 32 == 0) { //shift every 32 message calls - NOTE THIS SHOULD PROBABLY BE A SEPARATE FUNCTION!!!
+				//printf("Shifting all referenceBytes rights...\n");
 				int i;
 				for (i = 0; i < FRAMECOUNT; i++) {
 					frameTable[i].referenceByte = shiftRight(frameTable[i].referenceByte);
@@ -541,6 +545,11 @@ int main(int argc, char *argv[]) {
 				terminate = true;
 			}
 			
+		}
+		
+		if (numMessageCalls % 100 == 0) {
+			printf("%s: Current memory layout after %d memory requests at time %d:%d is:\n", programName, numMessageCalls, *clockSecs, *clockNano);
+			printFrameTable(frameTable);
 		}
 		
 	}

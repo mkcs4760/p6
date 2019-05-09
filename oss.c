@@ -220,12 +220,12 @@ int main(int argc, char *argv[]) {
 	while ((option = getopt(argc, argv, "hn:")) != -1) {
 		switch (option) {
 			case 'h' :	printf("Help page for OS_Klein_project6\n"); //for h, we print data to the screen
-						printf("Consists of the following:\n\tTwo .c file titled oss.c and user.c\n\tOne .h file titled messageQueue.h\n\tOne Makefile\n\tOne README.md file\n\tOne version control log.\n");
+						printf("Consists of the following:\n\tTwo .c file titled oss.c and user.c\n\tOne .h file titled messageQueue.h\n\tOne Makefile\n\tOne README file\n\tOne version control log.\n");
 						printf("The command 'make' will run the makefile and compile the program\n");
 						printf("Command line arguments for oss executable:\n");
 						printf("\t-n\t<maxTotalChildren>\tdefaults to 18\n");
 						printf("\t-h\t<NoArgument>\n");
-						printf("Version control acomplished using github. Log obtained using command 'git log > versionLog.txt\n");
+						printf("Version control accomplished using github. Log obtained using command 'git log > versionLog.txt\n");
 						exit(0);
 						break;
 			case 'n' :	if (atoi(optarg) <= 19) { //for s, we set the maximum of child processes we will have at a time
@@ -388,7 +388,15 @@ int main(int argc, char *argv[]) {
 				}
 				printf("We found it in frame %d\n", myFrame);
 				
+				*clockNano += 500;
+				}
+				if (*clockNano >= 1000000000) { //increment the next unit
+					*clockSecs += 1;
+					*clockNano -= 1000000000;
+				}
+				
 				//frameTable[myFrame].
+				int myFrame = 2;
 				printf("Changing referenceByte from %d", frameTable[myFrame].referenceByte);
 				frameTable[myFrame].referenceByte = setMostSignificantBit(frameTable[myFrame].referenceByte); //make sure this works!!!
 				printf(" to %d\n", frameTable[myFrame].referenceByte);

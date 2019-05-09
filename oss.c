@@ -369,8 +369,11 @@ int main(int argc, char *argv[]) {
 				//page fault and no free frame
 			printf("\n");	
 			int ourPage = abs(message.mesg_value) / 1024;	
-			printf("%s: Process %d is request access to memory bank %d, which can be found in page %d\n", programName, message.return_address, abs(message.mesg_value), ourPage);
-			
+			if (message.mesg_value < 0) {
+				printf("%s: Process %d requesting write of address %d, which can be found in page %d, at %d:%d\n", programName, message.return_address, abs(message.mesg_value), ourPage, *clockSecs, *clockNano);	
+			} else {
+				printf("%s: Process %d requesting read of address %d, which can be found in page %d, at %d:%d\n", programName, message.return_address, abs(message.mesg_value), ourPage, *clockSecs, *clockNano);	
+			}
 			
 			int result = findPIDInPCT(message.return_address, PCB);
 			if (result < 0) {
@@ -382,12 +385,13 @@ int main(int argc, char *argv[]) {
 			//printf("We found that PID is stored in PCT[%d]\n", result);
 			if (PCB[result].pageTable[ourPage] > -1) {
 				//no page fault - our data is there - handle correctly
-				printf("Our data already exists in in frame table!!\n");
+				//printf("Our data already exists in in frame table!!\n");
 				int myFrame = findFrameByPage(message.return_address, ourPage, frameTable);
 				if (result < 0) {
-					errorMessage(programName, "Errpr fomdomg page value in frame table. Inconsistent data ");
+					errorMessage(programName, "Error finding page value in frame table. Inconsistent data ");
 				}
-				printf("We found it in frame %d\n", myFrame);
+				//printf("We found it in frame %d\n", myFrame);
+				
 				
 				*clockNano += 500;
 				//TEMP:MWH308}
@@ -400,19 +404,21 @@ int main(int argc, char *argv[]) {
 					PCB[result].memoryAccessSecs += 1;
 					PCB[result].memoryAccessNano -= 1000000000;
 				}
-				
+				printf("%s: Address %d found in frame %d, giving data to %d at %d:%d\n", programName, abs(message.mesg_value), myFrame, message.return_address, *clockSecs, *clockNano);
+			
 				//frameTable[myFrame].
-				printf("Changing referenceByte from %d", frameTable[myFrame].referenceByte);
+				//printf("Changing referenceByte from %d", frameTable[myFrame].referenceByte);
 				frameTable[myFrame].referenceByte = setMostSignificantBit(frameTable[myFrame].referenceByte); //make sure this works!!!
-				printf(" to %d\n", frameTable[myFrame].referenceByte);
+				//printf(" to %d\n", frameTable[myFrame].referenceByte);
 				if (message.mesg_value < 0) {
 					frameTable[myFrame].dirtyBit = true;
 				}
-				printf("%d\t%d\t%d\t%d\t%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
+				//printf("%d\t%d\t%d\t%d\t%d\n", myFrame, frameTable[myFrame].dirtyBit, frameTable[myFrame].referenceByte, frameTable[myFrame].processStored, frameTable[myFrame].pageStored);
 				
 			} else {
 				//a page fault has occured. We now check if there are any frames available.
-				printf("Page fault!!\n");
+				//printf("Page fault!!\n");
+				printf("%s: Process %d\'s request has resulted in a page fault\n", programName, message.return_address);
 				numPageFaults++;
 				int myFrame = getAFrame(frameTable);
 				if (myFrame == -1) {
@@ -473,13 +479,27 @@ int main(int argc, char *argv[]) {
 					//store in this frame
 					printf("But frame %d is open for the taking!!\n", myFrame);
 					
+					*clockNano += 10000;
+					PCB[result].memoryAccessNano += 10000;
+					if (*clockNano >= 1000000000) { //increment the next unit
+						*clockSecs += 1;
+						*clockNano -= 1000000000;
+					}
+					if (PCB[result].memoryAccessNano >= 1000000000) { //increment the next unit
+						PCB[result].memoryAccessSecs += 1;
+						PCB[result].memoryAccessNano -= 1000000000;
+					}
+					
+					printf("%s: Address %d written to frame %d at %d:%d\n", programName, abs(message.mesg_value), myFrame, *clockSecs, *clockNano);
+			
+					
 					frameTable[myFrame].referenceByte = resetReferenceByte(frameTable[myFrame].referenceByte);
 					if (message.mesg_value < 0) {
 						frameTable[myFrame].dirtyBit = true;
 					}
 					frameTable[myFrame].processStored = message.return_address;
 					frameTable[myFrame].pageStored = ourPage;
-					printf("ATTENTION4!! Just set frameTable[%d].pageStored to %d\n", i, ourPage); //TESTING
+					//printf("ATTENTION4!! Just set frameTable[%d].pageStored to %d\n", i, ourPage); //TESTING
 					PCB[result].pageTable[ourPage] = myFrame; //save a link back
 					//THE ABOVE HUNK OF CODE APPEARS TO WORK
 					
@@ -526,8 +546,8 @@ int main(int argc, char *argv[]) {
 	}
 	
 	//print values for testing
-	printFrameTable(frameTable);
-	printPCB(PCB);
+	//printFrameTable(frameTable);
+	//printPCB(PCB);
 	
 	fprintf(output, "\nEnd of log\n");
 	

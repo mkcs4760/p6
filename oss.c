@@ -35,6 +35,7 @@ struct page {
 	int memoryAccessNano;
 };
 
+
 //int shmid; //shared memory id, made a global so we can use it easily in errorMessage
 
 //takes in program name and error string, and runs error message procedure
@@ -54,7 +55,7 @@ void errorMessage(char programName[100], char errorString[100]){
 void printPCB(struct page PCB[]) {
 	int i, j;
 	for (i = 0; i < totalProcessesToLaunch; i++) {
-		printf("%d: ", PCB[i].myPID);
+		printf("%d: %d hits: total time %d:%d  ", PCB[i].myPID, PCB[i].numMemoryAccesses,PCB[i].memoryAccessSecs, PCB[i].memoryAccessNano);
 		for (j = 0; j < PAGECOUNT; j++) {
 			printf("%d ", PCB[i].pageTable[j]);
 		}
@@ -165,7 +166,7 @@ int getSmallestFrame(struct frame frameTable[]) { //untested, but makes sense
 }
 
 int clearPage(int myProcess, int myPage, struct page PCB[]) {
-	int i;
+	/*int i;
 	for (i = 0; i < totalProcessesToLaunch; i++) {
 		printf("Let's compare %d and %d...\n", PCB[i].myPID, myProcess);
 		if (PCB[i].myPID == myProcess) {
@@ -173,7 +174,8 @@ int clearPage(int myProcess, int myPage, struct page PCB[]) {
 			return 0;
 		}
 	}
-	return -1;
+	return -1;*/
+	return 0;
 }
 
 void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[], char programName[100]) {
@@ -185,12 +187,12 @@ void clearProcessMemory(int process, struct page PCB[], struct frame frameTable[
 		printPCB(PCB);
 		errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
 	}
-	PCB[result].myPID = 0;
+	PCB[result].myPID *= -1;//set it to negative to signify it has terminated without clearing all the data
 	int i;
 	for (i = 0; i < PAGECOUNT; i++) {
-		PCB[result].pageTable[i] = -1; //we set an empty value to -1, since 0 could be a valid entry
+		PCB[result].pageTable[i] = -1; 
 	}
-	PCB[result].numMemoryAccesses = PCB[result].memoryAccessSecs = PCB[result].memoryAccessNano = 0; //this should set all 3 values to 0 in one line of code
+	//PCB[result].numMemoryAccesses = PCB[result].memoryAccessSecs = PCB[result].memoryAccessNano = 0; //this should set all 3 values to 0 in one line of code
 	//now clear frame table
 	for (i = 0; i < FRAMECOUNT; i++) {
 		if (frameTable[i].processStored == process) {
@@ -338,12 +340,10 @@ int main(int argc, char *argv[]) {
 			else if (pid > 0) { //parent
 				//numKidsRunning += 1;
 				//write to output file the time this process was launched
-				printf("Created child %d at %d:%d\n", pid, *clockSecs, *clockNano);
+				printf("%s: Created process %d at %d:%d\n", programName, pid, *clockSecs, *clockNano);
 				//save this process id in the PCT
 				if (savePID(pid, PCB, output) == 1) {
 					errorMessage(programName, "Could not save process PID in PCB - no space available ");
-				} else {
-					printf("Process PID saved successfully\n");
 				}
 				processesCalled++;
 				processesRunning++;
@@ -369,7 +369,8 @@ int main(int argc, char *argv[]) {
 				//page fault and no free frame
 			printf("\n");	
 			int ourPage = abs(message.mesg_value) / 1024;	
-			printf("Process %d is request access to memory bank %d, which can be found in page %d\n", message.return_address, abs(message.mesg_value), ourPage);
+			printf("%s: Process %d is request access to memory bank %d, which can be found in page %d\n", programName, message.return_address, abs(message.mesg_value), ourPage);
+			
 			
 			int result = findPIDInPCT(message.return_address, PCB);
 			if (result < 0) {
@@ -377,7 +378,7 @@ int main(int argc, char *argv[]) {
 				fclose(output);
 				errorMessage(programName, "Error validating return address of message received. Process does not appear to be currently running. ");
 			}
-			
+			PCB[result].numMemoryAccesses++;
 			//printf("We found that PID is stored in PCT[%d]\n", result);
 			if (PCB[result].pageTable[ourPage] > -1) {
 				//no page fault - our data is there - handle correctly
@@ -394,9 +395,13 @@ int main(int argc, char *argv[]) {
 					*clockSecs += 1;
 					*clockNano -= 1000000000;
 				}
+				PCB[result].memoryAccessNano += 500;
+				if (PCB[result].memoryAccessNano >= 1000000000) { //increment the next unit
+					PCB[result].memoryAccessSecs += 1;
+					PCB[result].memoryAccessNano -= 1000000000;
+				}
 				
 				//frameTable[myFrame].
-				//int myFrame = 2;
 				printf("Changing referenceByte from %d", frameTable[myFrame].referenceByte);
 				frameTable[myFrame].referenceByte = setMostSignificantBit(frameTable[myFrame].referenceByte); //make sure this works!!!
 				printf(" to %d\n", frameTable[myFrame].referenceByte);
@@ -424,19 +429,24 @@ int main(int argc, char *argv[]) {
 					printFrameTable(frameTable);
 					
 					//first we need to clear it from it's page table
-					int result = clearPage(frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored, PCB);
-					if (result < 0) {
+					if (clearPage(frameTable[smallestFrame].processStored, frameTable[smallestFrame].pageStored, PCB) < 0) {
 						errorMessage(programName, "Failed to find page. Unable to remove it and satisfy page fault ");
 					}
 					//increment clock, more if the dirty bit was set
 					if (frameTable[smallestFrame].dirtyBit) {
 						*clockNano += 50000;
+						PCB[result].memoryAccessNano += 50000;
 					} else {
 						*clockNano += 20000;
+						PCB[result].memoryAccessNano += 20000;
 					}
 					if (*clockNano >= 1000000000) { //increment the next unit
 						*clockSecs += 1;
 						*clockNano -= 1000000000;
+					}
+					if (PCB[result].memoryAccessNano >= 1000000000) { //increment the next unit
+						PCB[result].memoryAccessSecs += 1;
+						PCB[result].memoryAccessNano -= 1000000000;
 					}
 					
 					//now we need to clear it in the frame table

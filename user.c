@@ -37,9 +37,6 @@ int main(int argc, char *argv[]) {
 		memmove(programName, programName + 2, strlen(programName));
 	}
 	
-	
-	//printf("Child %d is alive!!\n", getpid());
-	
 	int shmid;
 	key_t key = 1094;
 	int *clockSecs, *clockNano;
@@ -55,7 +52,6 @@ int main(int argc, char *argv[]) {
 		perror("shmat error in user process");
 		exit(1);
 	}
-
 	
 	//now message queue
 	key_t mqKey = 2094;
@@ -66,7 +62,6 @@ int main(int argc, char *argv[]) {
 	}
 	//we are now ready to send messages whenever we desire
 	
-	//sleep(2);
 	int terminate = 0;
 	int loopCount = 0;
 	while (terminate != 1) {
@@ -75,13 +70,10 @@ int main(int argc, char *argv[]) {
 		if (randomNum(1, 10) < 4) {
 			//it's a write call
 			memoryRequest = memoryRequest * -1; //negative values are write calls, while positive are read calls
-			//printf("CHILD: Let's make that a write request\n");
-		} else {
-			//it's a read call
 		}
 		
 		message.mesg_type = getppid();
-		strncpy(message.mesg_text, "child to parent", 100);
+		//strncpy(message.mesg_text, "child to parent", 100);
 		message.mesg_value = memoryRequest;
 		message.return_address = getpid();
 		
@@ -100,12 +92,10 @@ int main(int argc, char *argv[]) {
 		//terminate++;
 		loopCount++;
 		
-		if ((randomNum(1, 100) > 90) & (loopCount > 20)) {
-			terminate = 1; //1% chance of terminating
+		if ((randomNum(1, 100) > 98) & (loopCount > 20)) {
+			terminate = 1;
 		}
 	}
 
-	
-	//printf("Child %d is shutting down at time %d:%d\n", getpid(), *clockSecs, *clockNano);
 	return 0;
 }

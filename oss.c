@@ -524,6 +524,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	
+	fprintf(output, "\nProgram completed successfully at %d:%d\n", *clockSecs, *clockNano);
+	
 	double memoryAccessPerSecond = getMemoryAccessPerSecond(*clockSecs, *clockNano, numMessageCalls);
 	double pageFaultsPerAccess = getPageFaultsPerAccess(numPageFaults, numMessageCalls);
 	double averageMemoryAccessSpeed = getAverageMemoryAccessSpeed(PCB);
@@ -533,12 +535,14 @@ int main(int argc, char *argv[]) {
 	fprintf(output, "\tAverage memory access speed: %f\n", averageMemoryAccessSpeed);
 	fprintf(output, "\tTotal page faults: %d\n", numPageFaults);
 	fprintf(output, "\tNumber of times frame table was full: %d\n", numFullPageHits);
+	
 	fprintf(output, "\nEnd of log\n");
 	
 	fclose(output);
 	
+	printf("Simulation complete. Results saved to log.txt\n");
+	
 	//destroy shared memory
-	printf("Parent terminating %d:%d\n", *clockSecs, *clockNano);
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if (ctl_return == -1) {
 		errorMessage(programName, "Function scmctl failed. ");

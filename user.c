@@ -66,7 +66,6 @@ int main(int argc, char *argv[]) {
 	int loopCount = 0;
 	while (terminate != 1) {
 		int memoryRequest = randomNum(0, 32000);
-		//printf("We have a memory request for %d\n", memoryRequest);
 		if (randomNum(1, 10) < 4) {
 			//it's a write call
 			memoryRequest = memoryRequest * -1; //negative values are write calls, while positive are read calls

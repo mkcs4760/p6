@@ -19,8 +19,7 @@
 
 int totalProcessesToLaunch = 18;
 
-struct frame {
-	//a frame consists of a dirty bit, a reference byte, the process that has a page being stored here, and the page of that process that is being stored here
+struct frame { //a frame consists of a dirty bit, a reference byte, the process that has a page being stored here, and the page of that process that is being stored here
 	bool dirtyBit;
 	unsigned char referenceByte;
 	int processStored;
@@ -35,9 +34,6 @@ struct page {
 	int memoryAccessNano;
 };
 
-
-//int shmid; //shared memory id, made a global so we can use it easily in errorMessage
-
 //takes in program name and error string, and runs error message procedure
 void errorMessage(char programName[100], char errorString[100]){
 	char errorFinal[200];
@@ -47,7 +43,6 @@ void errorMessage(char programName[100], char errorString[100]){
 	//destroy message queue...NEED TO FIND A WAY TO DO THAT WITHOUT GLOBAL...
 	
 	//destroy shared memory
-
 
 	kill(-1*getpid(), SIGKILL);
 }
@@ -102,26 +97,21 @@ unsigned char resetReferenceByte() {
 }
 	
 int savePID(int childPID, struct page PCB[], FILE * output) {
-	//printf("we made it here\n");
 	int i;
 	for (i = 0; i < totalProcessesToLaunch; i++) {
-		//printf("Let's compare %d and %d...", PCB[i].myPID, 0);
 		if (PCB[i].myPID < 1) {
 			PCB[i].myPID = childPID;
 			fprintf(output, "!!!Setting pid to %d!!!\n", childPID);
 			return 0;
 		}
 	}
-	//printf("and now we're done\n");
 	return 1;
 }	
 
 int findPIDInPCT(int PID, struct page PCB[]) {
 	int i;
-	for (i = 0; i < totalProcessesToLaunch; i++) {
-				
+	for (i = 0; i < totalProcessesToLaunch; i++) {				
 		if (PCB[i].myPID == PID) {
-			//this is the slot that we're in
 			return i;		
 		}
 	}
@@ -148,16 +138,12 @@ int getAFrame(struct frame frameTable[]) {
 	return -1;
 }
 
-int getSmallestFrame(struct frame frameTable[]) { //untested, but makes sense
-	
+int getSmallestFrame(struct frame frameTable[]) { //untested, but makes sense	
 	int i;
 	int smallestFrame = -1;
 	int smallestFrameValue = 256;
 	for (i = 0; i < FRAMECOUNT; i++) {
-		//printf("SMALL FRAME: Let's compare %d and %d\n", frameTable[i].referenceByte, smallestFrameValue);
 		if (frameTable[i].referenceByte < smallestFrameValue) {
-		//int cmp = memcmp(frameTable[i].referenceByte, smallestFrameValue, 1);
-		//if (cmp < 0);
 			smallestFrame = i;
 			smallestFrameValue = frameTable[i].referenceByte;
 		}
@@ -537,7 +523,7 @@ int main(int argc, char *argv[]) {
 		
 		temp = waitpid(-1, NULL, WNOHANG);
 		if (temp > 0) {
-			printf("Child %d ended at %d:%d\n", temp, *clockSecs, *clockNano);
+			printf("%s: Process %d ended at %d:%d\n", programName, temp, *clockSecs, *clockNano);
 			//deallocate all values
 			clearProcessMemory(temp, PCB, frameTable, programName);
 			processesRunning--;
@@ -553,10 +539,6 @@ int main(int argc, char *argv[]) {
 		}
 		
 	}
-	
-	//print values for testing
-	//printFrameTable(frameTable);
-	//printPCB(PCB);
 	
 	fprintf(output, "\nEnd of log\n");
 	

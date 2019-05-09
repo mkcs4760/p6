@@ -389,14 +389,14 @@ int main(int argc, char *argv[]) {
 				printf("We found it in frame %d\n", myFrame);
 				
 				*clockNano += 500;
-				}
+				//TEMP:MWH308}
 				if (*clockNano >= 1000000000) { //increment the next unit
 					*clockSecs += 1;
 					*clockNano -= 1000000000;
 				}
 				
 				//frameTable[myFrame].
-				int myFrame = 2;
+				//int myFrame = 2;
 				printf("Changing referenceByte from %d", frameTable[myFrame].referenceByte);
 				frameTable[myFrame].referenceByte = setMostSignificantBit(frameTable[myFrame].referenceByte); //make sure this works!!!
 				printf(" to %d\n", frameTable[myFrame].referenceByte);
